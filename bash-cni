@@ -33,36 +33,56 @@ allocate_ip(){
 
 case $CNI_COMMAND in
 ADD)
+	echo Executing Add
 	network=$(echo "$stdin" | jq -r ".network")
+	echo Network: $network
 	subnet=$(echo "$stdin" | jq -r ".subnet")
+	echo Subnet: $subnet
 	subnet_mask_size=$(echo $subnet | awk -F  "/" '{print $2}')
+	echo Subnet Mask Size: $subnet_mask_size
 
 	all_ips=$(nmap -sL -n $subnet | grep "Nmap scan report" | awk '{print $NF}')
+	echo All Ips: $all_ips
 	all_ips=(${all_ips[@]})
+	echo All Ips Processed: $all_ips
 	skip_ip=${all_ips[0]}
+	echo Skip Ip: $skip_ip
 	gw_ip=${all_ips[1]}
+	echo Gateway Ip: $skip_ip
 	reserved_ips=$(cat $IP_STORE 2> /dev/null || printf "$skip_ip\n$gw_ip\n") # reserving 10.244.0.0 and 10.244.0.1 
+	echo Reserved IPs: $reserved_ips
 	reserved_ips=(${reserved_ips[@]})
+	echo Reserved IPs Processed: $reserved_ips
 	printf '%s\n' "${reserved_ips[@]}" > $IP_STORE
 	container_ip=$(allocate_ip)
+	echo Container IP: $container_ip
 
 	mkdir -p /var/run/netns/
+	echo Running: ln -sfT $CNI_NETNS /var/run/netns/$CNI_CONTAINERID
 	ln -sfT $CNI_NETNS /var/run/netns/$CNI_CONTAINERID
 
 	rand=$(tr -dc 'A-F0-9' < /dev/urandom | head -c4)
 	host_if_name="veth$rand"
+	echo Running: ip link add $CNI_IFNAME type veth peer name $host_if_name
 	ip link add $CNI_IFNAME type veth peer name $host_if_name 
 
+	echo Running: ip link set $host_if_name up
 	ip link set $host_if_name up 
+	echo Running: ip link set $host_if_name master cni0
 	ip link set $host_if_name master cni0 
 
+	echo Running: ip link set $CNI_IFNAME netns $CNI_CONTAINERID
 	ip link set $CNI_IFNAME netns $CNI_CONTAINERID
+	echo Running: ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
 	ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
+	echo Running: ip netns exec $CNI_CONTAINERID ip addr add $container_ip/$subnet_mask_size dev $CNI_IFNAME
 	ip netns exec $CNI_CONTAINERID ip addr add $container_ip/$subnet_mask_size dev $CNI_IFNAME
+	echo Running: ip netns exec $CNI_CONTAINERID ip route add default via $gw_ip dev $CNI_IFNAME
 	ip netns exec $CNI_CONTAINERID ip route add default via $gw_ip dev $CNI_IFNAME 
 
 	mac=$(ip netns exec $CNI_CONTAINERID ip link show eth0 | awk '/ether/ {print $2}')
-echo "{
+	echo Mac: $mac
+response="{
   \"cniVersion\": \"0.3.1\",
   \"interfaces\": [                                            
       {
@@ -79,8 +99,9 @@ echo "{
           \"interface\": 0 
       }
   ]
-}" >&3
-
+}"
+        echo $reponse
+        echo $reponse >&3
 ;;
 
 DEL)
