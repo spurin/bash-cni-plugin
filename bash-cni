@@ -37,7 +37,7 @@ ADD)
 	subnet=$(echo "$stdin" | jq -r ".subnet")
 	subnet_mask_size=$(echo $subnet | awk -F  "/" '{print $2}')
 
-	all_ips=$(nmap -sL $subnet | grep "Nmap scan report" | awk '{print $NF}')
+	all_ips=$(nmap -sL -n $subnet | grep "Nmap scan report" | awk '{print $NF}')
 	all_ips=(${all_ips[@]})
 	skip_ip=${all_ips[0]}
 	gw_ip=${all_ips[1]}
