@@ -1,5 +1,14 @@
 #!/bin/bash -e
 
+# Example Input -
+#
+# stdin = {"cniVersion":"0.3.1","name":"mynet","network":"10.244.0.0/16","subnet":"10.244.0.0/16","type":"bash-cni"}
+# $CNI_COMMAND = ADD
+# $CNI_CONTAINERID = d6621b6a1b441eb688277913fc0c9b82481e74eef47d08d66f0ba13cdba9cebc
+# $CNI_IFNAME = eth0
+# $CNI_NETNS = cni-52a7407b-71e5-a807-1f6f-aadb42d7a6b8
+
+DEBUG=1
 if [[ ${DEBUG} -gt 0 ]]; then set -x; fi
 
 exec 3>&1 # make stdout available as fd 3 for the result
@@ -64,21 +73,21 @@ ADD)
 	rand=$(tr -dc 'A-F0-9' < /dev/urandom | head -c4)
 	host_if_name="veth$rand"
 	echo Running: ip link add $CNI_IFNAME type veth peer name $host_if_name
-	ip link add $CNI_IFNAME type veth peer name $host_if_name 
+	ip link add h-${host_if_name} type veth peer name c-${host_if_name}
 
-	echo Running: ip link set $host_if_name up
-	ip link set $host_if_name up 
-	echo Running: ip link set $host_if_name master cni0
-	ip link set $host_if_name master cni0 
+	echo Running: ip link set h-${host_if_name} up
+	ip link set h-${host_if_name} up 
+	echo Running: ip link set h-${host_if_name} master cni0
+	ip link set h-${host_if_name} master cni0 
 
-	echo Running: ip link set $CNI_IFNAME netns $CNI_CONTAINERID
-	ip link set $CNI_IFNAME netns $CNI_CONTAINERID
-	echo Running: ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
-	ip netns exec $CNI_CONTAINERID ip link set $CNI_IFNAME up
-	echo Running: ip netns exec $CNI_CONTAINERID ip addr add $container_ip/$subnet_mask_size dev $CNI_IFNAME
-	ip netns exec $CNI_CONTAINERID ip addr add $container_ip/$subnet_mask_size dev $CNI_IFNAME
-	echo Running: ip netns exec $CNI_CONTAINERID ip route add default via $gw_ip dev $CNI_IFNAME
-	ip netns exec $CNI_CONTAINERID ip route add default via $gw_ip dev $CNI_IFNAME 
+	echo Running: ip link set c-${host_if_name} netns $CNI_CONTAINERID
+	ip link set c-${host_if_name} netns $CNI_CONTAINERID
+	echo Running: ip netns exec $CNI_CONTAINERID ip link set c-${host_if_name} up
+	ip netns exec $CNI_CONTAINERID ip link set c-${host_if_name} up
+	echo Running: ip netns exec $CNI_CONTAINERID ip addr add $container_ip/$subnet_mask_size dev c-${host_if_name}
+	ip netns exec $CNI_CONTAINERID ip addr add $container_ip/$subnet_mask_size dev c-${host_if_name}
+	echo Running: ip netns exec $CNI_CONTAINERID ip route add default via $gw_ip dev c-${host_if_name}
+	ip netns exec $CNI_CONTAINERID ip route add default via $gw_ip dev c-${host_if_name}
 
 	mac=$(ip netns exec $CNI_CONTAINERID ip link show eth0 | awk '/ether/ {print $2}')
 	echo Mac: $mac
